@@ -1,0 +1,11 @@
+@ Hom = λA.λB.θf.λx.[(f [x : A]) : B] : ✲
+
+@ End = λA.((Hom A) A) : ✲
+
+@ Nat = λF.λG.λA.θf.λx.[(f [x : (F A)]) : (G A)] : ✲
+
+@ Church = ((Nat End) End) : ✲
+
+@ id = λA.λt.t : End
+
+@ two = λA.λs.λz.(s (s z)) : Church
