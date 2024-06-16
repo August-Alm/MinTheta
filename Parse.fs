@@ -182,7 +182,7 @@ module Parse =
       consume T_Sec tokenizer
       parse tokenizer (bind x t env)
     | _, T_Star -> Star
-    | pos, tok -> error pos $"syntax error but got {tok}"
+    | pos, tok -> error pos $"syntax error; got {tok}"
 
   let parseName (tokenizer : Tokenizer) =
     match tokenizer.ReadToken () with
@@ -200,14 +200,15 @@ module Parse =
     { Name = x; Term = t; Type = typ }
   
   let parseMod (tokenizer : Tokenizer) =
-    let rec go acc =
+    let m = Mod ()
+    let rec go () =
       match tokenizer.ReadToken () with
-      | _, T_Eof -> acc
+      | _, T_Eof -> m
       | _, T_Let x ->
-        let def = parseDef x tokenizer
-        go (Map.add def.Name def acc)
+        m.AddDef (parseDef x tokenizer)
+        go ()
       | pos, tok -> error pos $"expected '@ <name>' but got {tok}"
-    go Map.empty
+    go ()
 
   let parseTermFromString (str : string) =
     Input.InputOfString str

@@ -2,6 +2,8 @@ namespace MinTheta
 
 module rec Core =
 
+  open System.Collections.Generic
+
   let inline index (dep : int) (l : int) =
     if l < 0 then dep + l else l
   
@@ -17,12 +19,25 @@ module rec Core =
     | Ann of Term * Term
     | Star
   
-  type Def = { Name : string; Term : Term; Type : Term }
+  type Def =
+    { Name : string
+      Term : Term
+      Type : Term
+    }
 
-  type Mod = Map<string, Def>
-  
+  type Mod () =
+    let defs = ResizeArray<Def> ()
+    let refs = Dictionary<string, Hoas * bool> ()
+    member _.Defs = defs :> seq<Def>
+    member _.AddDef def = defs.Add def
+    member _.SetRef x t = refs[x] <- (t, false)
+    member _.SetNormalisedRef x t = refs[x] <- (t, true)
+    member _.ContainsRef x = refs.ContainsKey x
+    member _.GetRef x = let t, _ = refs[x] in t
+    member _.TryGetRefState x = refs.TryGetValue x
+
   type Hoas =
-    | HRef of HDef
+    | HRef of string
     | HVar of string * int
     | HLam of string * (Hoas -> Hoas)
     | HApp of Hoas * Hoas
@@ -30,16 +45,16 @@ module rec Core =
     | HAnn of Hoas * Hoas
     | HStar
   
-  type HDef = { Name : string; HTerm : Hoas; HType : Hoas }
-
   type Env = Hoas list
 
   let rec hoas (m : Mod) (env : Env) (t : Term) =
     match t with
     | Ref x ->
-      match Map.tryFind x m with
-      | Some def -> HRef (hoasDef m env def)
-      | None -> failwithf "undefined reference: %s" x
+      if not (m.ContainsRef x) then
+        match Seq.tryFind (fun d -> d.Name = x) m.Defs with
+        | Some def -> let t = hoas m env def.Term in m.SetRef x t
+        | None -> failwithf "undefined reference: %s" x
+      HRef x
     | Var (x, i) ->
       match List.tryItem (int i) env with
       | Some v -> v
@@ -50,11 +65,6 @@ module rec Core =
     | Ann (t, u) -> HAnn (hoas m env t, hoas m env u)
     | Star -> HStar
   
-  and hoasDef (m : Mod) (env : Env) (def : Def) =
-    { Name = def.Name
-      HTerm = hoas m env def.Term
-      HType = hoas m env def.Type }
-  
   let fresh (xs : string list) (x : string) =
     let rec go x = if List.contains x xs then go (x + "'") else x
     let x = go x
@@ -63,7 +73,7 @@ module rec Core =
   
   let rec term (xs : string list) (t : Hoas) =
     match t with
-    | HRef def -> Ref def.Name
+    | HRef x -> Ref x
     | HVar (x, l) -> Var (x, index (List.length xs) l)
     | HLam (x, t) -> let x, xv, xs = fresh xs x in Lam (x, term xs (t xv))
     | HApp (t, u) -> App (term xs t, term xs u)
@@ -72,52 +82,68 @@ module rec Core =
     | HStar -> Star
 
   // Definitional equality.
-  let rec eq dep t u =
+  let rec eq (m : Mod) dep t u =
     match t, u with
-    | HRef dt, HRef du -> eq dep dt.HTerm du.HTerm
+    | HRef x, HRef y -> eq m dep (m.GetRef x) (m.GetRef y) //dt.Name = du.Name 
+    | HRef x, u -> eq m dep (m.GetRef x) u
+    | t, HRef y -> eq m dep t (m.GetRef y)
     | HVar (_, i), HVar (_, j) -> i = j
     | HLam (x, t), HLam (_, u) ->
-      eq (dep + 1) (t (HVar (x, dep))) (u (HVar (x, dep)))
+      eq m (dep + 1) (t (HVar (x, dep))) (u (HVar (x, dep)))
     | HLam (x, t), u ->
-      eq (dep + 1) (t (HVar (x, dep))) (HApp (u, HVar (x, dep)))
+      eq m (dep + 1) (t (HVar (x, dep))) (HApp (u, HVar (x, dep)))
     | t, HLam (y, u) ->
-      eq (dep + 1) (HApp (t, HVar (y, dep))) (u (HVar (y, dep)))
+      eq m (dep + 1) (HApp (t, HVar (y, dep))) (u (HVar (y, dep)))
     | HApp (f, a), HApp (g, b) ->
-      eq dep f g && eq dep a b
+      eq m dep f g && eq m dep a b
     | HTht (x, t), HTht (_, u) ->
-      eq (dep + 1) (t (HVar (x, dep))) (u (HVar (x, dep)))
+      eq m (dep + 1) (t (HVar (x, dep))) (u (HVar (x, dep)))
     | HTht (x, t), u ->
-      eq (dep + 1) (t (HVar (x, dep))) (HAnn (HVar (x, dep), u))
+      eq m (dep + 1) (t (HVar (x, dep))) (HAnn (HVar (x, dep), u))
     | t, HTht (y, u) ->
-      eq (dep + 1) (HAnn (HVar (y, dep), t)) (u (HVar (y, dep)))
+      eq m (dep + 1) (HAnn (HVar (y, dep), t)) (u (HVar (y, dep)))
     | HAnn (t, a), HAnn (u, b) ->
-      eq dep t u && eq dep a b
+      eq m dep t u && eq m dep a b
     | HStar, HStar -> true
     | _ -> false  
   
-  let rec norm (t : Hoas) =
+  let rec norm (m : Mod) (t : Hoas) =
+    //printfn "norm: %s" (show (quote t))
     match t with
-    | HRef def -> norm def.HTerm
+    | HRef x ->
+      match m.TryGetRefState x with
+      | false, _ ->
+        match Seq.tryFind (fun d -> d.Name = x) m.Defs with
+        | Some def ->
+          let t = norm m (hoas m [] def.Term)
+          m.SetNormalisedRef x t
+          t
+        | None -> failwithf "undefined reference: %s" x
+      | true, (t, true) -> t
+      | true, (t, false) ->
+        let t = norm m t
+        m.SetNormalisedRef x t
+        t
     | HVar _ -> t
-    | HLam (x, t) -> HLam (x, fun v -> norm (t v))
+    | HLam (x, t) -> HLam (x, fun v -> norm m (t v))
     | HApp (t, u) ->
-      match norm t, norm u with
+      match norm m t, norm m u with
       | HLam (_, t), u -> t u
-      | HTht (x, t), u -> HTht (x, fun v -> norm (HApp (t v, u)))
+      | HTht (x, t), u -> HTht (x, fun v -> norm m (HApp (t v, u)))
       | t, u -> HApp (t, u)
-    | HTht (x, t) -> HTht (x, fun v -> norm (t v))
+    | HTht (x, t) -> HTht (x, fun v -> norm m (t v))
     | HAnn (t, u) ->
-      match norm t, norm u with
+      match norm m t, norm m u with
       | t, HTht (_, u) -> u t
-      | HLam (x, t), HLam (_, u) -> HLam (x, fun v -> norm (HAnn (t v, u v)))
-      | HLam (x, t), HStar -> HLam (x, fun v -> norm (HAnn (t v, HStar)))
-      | t, HLam (y, u) -> HLam (y, fun v -> norm (HAnn (t, u v)))
-      | HAnn (t, a) as ta, b -> if eq 0 a b then norm t else HAnn (ta, b)
+      | HLam (x, t), HLam (_, u) -> HLam (x, fun v -> norm m (HAnn (t v, u v)))
+      | HLam (x, t), HStar -> HLam (x, fun v -> norm m (HAnn (t v, HStar)))
+      | t, HLam (y, u) -> HLam (y, fun v -> norm m (HAnn (t, u v)))
+      | HAnn (t, a) as ta, b -> if eq m 0 a b then norm m t else HAnn (ta, b)
       | HTht _ as t, HStar -> t
       | t, u -> HAnn (t, u)
     | HStar -> HStar
   
-  let eval m t = norm (hoas m [] t)
+  let eval m t = norm m (hoas m [] t)
 
   let quote t = term [] t
 
@@ -137,10 +163,13 @@ module rec Core =
   let check m (t : Term) (typ : Term) =
     let tNf = eval m t
     let tAnn = eval m (Ann (t, typ))
-    if eq 0 tNf tAnn then Ok (quote tNf)
+    if eq m 0 tNf tAnn then Ok (quote tNf)
     else Error (quote tNf, quote tAnn)
   
-  let checkAndReport m (trm : Term) (typ : Term) =
+  let checkDef m (def : Def) =
+    let trm = def.Term
+    let typ = def.Type
+    printfn "checking %s : %s" def.Name (show typ)
     match check m trm typ with
     | Ok t ->
       [ "all good!"
@@ -158,6 +187,7 @@ module rec Core =
       |> String.concat "\n\t"
       |> printfn "%s"
 
+  let checkMod m = Seq.iter (checkDef m) m.Defs
 
 
 module Library =
