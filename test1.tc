@@ -1,11 +1,16 @@
-@ Hom = λA.λB.θf.λx.[(f [x : A]) : B] : ✲
+def Hom = λA.λB.θf.λx.[(f [x : A]) ⇓ B]
 
-@ End = λA.((Hom A) A) : ✲
+def Any = θt.t
 
-@ Nat = λF.λG.λA.θf.λx.[(f [x : (F A)]) : (G A)] : ✲
+def End = λA.(Hom A A)
 
-@ Church = ((Nat End) End) : ✲
+def Nat = λF.λG.λA.θf.λx.[(f [x : (F A)]) ⇓ (G A)]
 
-@ id = λA.λt.t : End
+def Church = λA.(Hom (Hom A A) (Hom A A))
+  #λA.θn.λs.λz.[(n [s : (Hom A A)] [z : A]) ⇓ A]
 
-@ two = λA.λs.λz.(s (s z)) : Church
+let id : λA.(Hom A A) = λA.λt.t
+
+let one : Church = λA.λs.λz.(s z)
+
+let two : Church = λA.λs.λz.(s (s z))

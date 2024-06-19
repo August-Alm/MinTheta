@@ -1,0 +1,18 @@
+def Hom = λA.λB.θf.λx.[(f [x : A]) : B]
+
+def Endy = ((Hom Natty) Natty)
+
+# Scott encoding.
+def Natty
+  = θnat.λP.λs.λz.
+    [(nat
+      P
+      λn.[(s [n : Natty]) : (P (succ n))]
+      [z : (P zero)])
+    : (P nat) ] 
+
+
+let succ : (Hom Natty Natty)
+  = λn.λP.λs.λz.((s n) (n P s z))
+
+let zero : Natty = λP.λs.λz.z

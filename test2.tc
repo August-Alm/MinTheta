@@ -1,32 +1,23 @@
-@ Bool = θbool.λP.λt.λf.[(((bool P) [t : (P true)]) [f : (P false)]) : (P bool)] : ✲
+def Bool
+  = θbool.λP.λt.λf.
+    [(bool P [t : (P true)] [f : (P false)]) ⇓ (P bool)]
 
-@ true = λP.λt.λf.t : Bool
+let true : Bool = λP.λt.λf.t
 
-@ false = λP.λt.λf.f : Bool
+let false : Bool = λP.λt.λf.f
 
-@ Hom = λA.λB.θf.λx.[(f [x : A]) : B] : ✲
+def Hom = λA.λB.θf.λx.[(f [x : A]) ⇓ B]
 
-@ Either =
-  λA.λB.θself.λP.λl.λr.
-    [(((self P)
-       λa.[(l [a : A]) : (P (((left A) B) a))])
-       λb.[(r [b : B]) : (P (((right A) B) b))]) :
-       (P self)
-    ] : ✲
+def Either 
+  = λA.λB.θself.λP.λl.λr.
+    [(self
+      P
+      [l : θl.λa.[(l [a : A]) ⇓ (P (left A B a))]]
+      [r : θr.λb.[(r [b : B]) ⇓ (P (right A B b))]])
+    ⇓ (P self)] 
 
-@ left = λA.λB.λa.λP.λl.λr.(l a) : λA.λB.((Hom A) ((Either A) B))
-  
-@ right = λA.λB.λb.λP.λl.λr.(r b) : λA.λB.((Hom B) ((Either A) B))
+let left : λA.λB.(Hom A (Either A B))
+  = λA.λB.λa.λP.λl.λr.(l a)   
 
-# θs.λn.[s : ((Hom (P [n : Natty])) (P (succ [n : Natty])))]
-# Scott encoding.
-#@ Natty =
-#  θnat.λP.λs.λz.
-#    [(((nat P)
-#       λn.[(s [n : Natty]) : (P (succ n))])
-#       [z : (P zero)]) :
-#       (P nat)] : ✲
-#
-#@ succ = λn.λP.λs.λz.((s n) (((n P) s) z)) : ((Hom Natty) Natty)
-#
-#@ zero = λP.λs.λz.z : Natty
+let right : λA.λB.(Hom B (Either A B))
+  = λA.λB.λb.λP.λl.λr.(r b)

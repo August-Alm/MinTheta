@@ -1,0 +1,32 @@
+#def Hom = λA.λB.θf.λx.[(f [x : [A ⇓ ✲]]) ⇓ [B ⇓ ✲]]
+def Hom = λA.λB.θf.λx.[(f [x : A]) ⇓ B]
+
+#def kbi = (Hom ✲ (Hom ✲ ✲))
+def kbi = θH.λX.λY.[(H [X : ✲] [Y : ✲]) ⇓ ✲]
+
+let HOM : kbi = λA.λB.θf.λx.[(f [x : A]) ⇓ B]
+#λA.λB.θf.λx.[(f [x : [A ⇓ ✲]]) ⇓ [B ⇓ ✲]]
+
+def Alg = λF.λX.(Hom (F X) X)
+
+def Mu = λF.λX.(Hom (Alg F X) X)
+#def Mu =
+#  λF.λX.θmu.λk.
+#    [(mu λy.[(k [y : (F X)]) : X]) : X ]
+
+def All = λT.θs.λX.[s : (T X)]
+
+def Free = λF.(All (Mu F))
+
+def Fold = λF.λX.(Hom (Hom (Alg F X) (Free F)) X)
+
+#def Fold = λF.λX.(Hom (Hom (Alg F X) (Mu F X)) X)
+#def Fold 
+#  = λF.λX.θf.λk.λt.
+#    [(f
+#      [k : ((Alg F) X)]
+#      [t : ((Mu F) X)])
+#    : X]
+
+let fold : λF.λX.(Fold F X)
+  = λF.λX.λk.λt.(t X k)
