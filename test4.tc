@@ -42,11 +42,8 @@ let fold : Fold = λF.λX.λk.λt.(t X k)
 let in : λF.(Hom (FMap F) (Hom (F (Free F)) (Free F)))
   = λF.λfmap.λs.λX.λk.(k (fmap (Free F) X (fold F X k) s))
 
-let Fold : kext
-  = ΛF.ΛX.((Hom ((Alg F) X) ((Hom (Free F)) X)))
-
 let fold : Fold
   = λF.λX.λk.λt.((t X) k)
 
-let in : ΛF.((Hom (FMap F)) ((Hom (F (Free F))) (Free F)))
+let in : λF.(Hom (FMap F) (Hom (F (Free F)) (Free F)))
   = λF.λfmap.λs.λX.λk.(k ((((fmap (Free F)) X) (((fold F) X) k)) s))
