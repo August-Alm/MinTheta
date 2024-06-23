@@ -145,14 +145,17 @@ module rec Core =
       match norm m t, norm m u with
       | HRef x, u -> norm m (HApp (m.GetRef x, u))
       | HLam (_, t), u -> norm m (t u)
-      //| HTht (x, t), HLam (_, u) -> HTht (x, fun v -> norm m (HApp (t v, u v)))
-      | HTht (x, t, tA), u -> HTht (x, (fun v -> norm m (HApp (t v, u))), fun v -> norm m (HApp (tA v, u)))// HAnn (v, u))))
+      //| HTht (x, t, tA), HLam (_, u) ->
+      //  HTht (x, (fun v -> norm m (HApp (t v, u v))), fun v -> norm m (HApp (tA v, u v)))
+      | HTht (x, t, tA), u ->
+        HTht (x, (fun v -> norm m (HApp (t v, u))), fun v -> norm m (HApp (tA v, u)))// HAnn (v, u))))
       | t, u -> HApp (norm m t, norm m u)
     | HTht (x, t, tA) -> HTht (x, (fun v -> norm m (t v)), fun v -> norm m (tA v))
     | HAnn (t, u) ->
       match norm m t, norm m u with
       | t, HRef y -> norm m (HAnn (t, m.GetRef y))
       | t, HTht (_, _, u) -> norm m (u t)
+      | HLam (_, t), HLam (y, u) -> HLam (y, fun v -> norm m (HAnn (t v, u v)))
       | t, HLam (y, u) -> HLam (y, fun v -> norm m (HAnn (HApp (t, v), u v)))
       //| HAnn (t, a), b when eq m 0 a b -> norm m (HAnn (t, b))
       //| HTht _ as t, HStar -> t
@@ -162,6 +165,7 @@ module rec Core =
       match norm m t, norm m u with
       | t, HRef y -> norm m (HChk (t, m.GetRef y))
       | t, HTht (_, u, _) -> norm m (u t)
+      | HLam (_, t), HLam (y, u) -> HLam (y, fun v -> norm m (HChk (t v, u v)))
       | t, HLam (y, u) -> HLam (y, fun v -> norm m (HChk (HApp (t, v), u v)))
       //| HChk (t, a), b when eq m 0 a b -> norm m (HChk (t, b))
       | HAnn (t, a), b when eq m 0 a b -> norm m t

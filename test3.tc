@@ -1,4 +1,4 @@
-def Hom = λA.λB.θf.λx.[(f [x : A]) : B]
+def Hom = λA.λB.θf.λx.[(f [x : A]) ⇓ B]
 
 def Endy = ((Hom Natty) Natty)
 
@@ -7,9 +7,9 @@ def Natty
   = θnat.λP.λs.λz.
     [(nat
       P
-      λn.[(s [n : Natty]) : (P (succ n))]
+      λn.[(s [n ⇓ Natty]) : (P (succ n))]
       [z : (P zero)])
-    : (P nat) ] 
+    ⇓ (P nat) ] 
 
 
 let succ : (Hom Natty Natty)

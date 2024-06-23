@@ -7,7 +7,6 @@ def End = λA.(Hom A A)
 def Nat = λF.λG.λA.θf.λx.[(f [x : (F A)]) ⇓ (G A)]
 
 def Church = λA.(Hom (Hom A A) (Hom A A))
-  #λA.θn.λs.λz.[(n [s : (Hom A A)] [z : A]) ⇓ A]
 
 let id : λA.(Hom A A) = λA.λt.t
 
